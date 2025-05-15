@@ -46,7 +46,12 @@ function sideOfLine(px,py, ax,ay, bx,by) {
 
 function sliceQuad(quadPts, cutA, cutB) {
   const polyA = [],intersections = [], polyB = [];
-  const [ax, ay] = cutA, [bx, by] = cutB;
+  // split into two statements:
+  
+const ax = cutA.x, 
+        ay = cutA.y, 
+        bx = cutB.x, 
+        by = cutB.y;
 
   // 1. compute side for each vertex
   const sides = quadPts.map(p =>
@@ -108,8 +113,11 @@ const quadPts = [
 const [quads, setQuads] = useState([
     { id: 0, pts: quadPts }
   ]);
+  
+const slicePointsRef          = useRef([]);
+  const [_, forceRerender]      = useState(0);
 
-
+  
   useEffect(() => {
     spawnInterval.current = setInterval(spawnFruit, 1500);
     return () => clearInterval(spawnInterval.current);
@@ -127,24 +135,27 @@ const [quads, setQuads] = useState([
     if (nativeEvent.state === State.END && slicePoints.length >= 2) {
     const last = slicePoints.at(-1);
     const prev = slicePoints.at(-3);
-    //console.log("last",last);
-    //console.log("prev",prev);
-    // slice just the original quad:
-    const { polyA, polyB,intersections } = sliceQuad(
-      quadPts,
-      [prev.x, prev.y],
-      [last.x, last.y]
-    );
 
-    setQuads([
-      { id: 1, pts: polyA },
-      { id: 2, pts: polyB }
-    ]);
+   const newPolys = [];
+
+
+    quads.forEach(q => {
+      //console.log("q",q.pts);
+      // try slicing this polygon
+     const { polyA, polyB, intersections } = sliceQuad(q.pts, last, prev);
+    if (intersections.length >= 2) {
+      // it actually got cut in two—keep both halves
+      newPolys.push({ id: `${q.id}-a`, pts: polyA });
+      newPolys.push({ id: `${q.id}-b`, pts: polyB });
+    } else {
+      // no real cut—keep the original polygon
+      newPolys.push(q);
+    }
+     setDebugDots(intersections);
+     setQuads(newPolys);
+    });
+
     setSlicePoints([]);
-    console.log("intersections", intersections);
-    console.log("polyA", polyA);
-    console.log("polyB", polyB);
-    setDebugDots(intersections);
   }
   };
 
