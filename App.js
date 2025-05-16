@@ -48,10 +48,10 @@ function sliceQuad(quadPts, cutA, cutB) {
   const polyA = [],intersections = [], polyB = [];
   // split into two statements:
   
-const ax = cutA.x, 
-        ay = cutA.y, 
-        bx = cutB.x, 
-        by = cutB.y;
+const ax = cutA[0], 
+        ay = cutA[1], 
+        bx = cutB[0], 
+        by = cutB[1];
 
   // 1. compute side for each vertex
   const sides = quadPts.map(p =>
@@ -127,62 +127,54 @@ const slicePointsRef          = useRef([]);
     // TODO: randomize x, velocity, color, radius & push into `fruits`
   };
 
-  const onGestureEvent = ({ nativeEvent: { x, y } }) => {
-    setSlicePoints(p => [...p, { x, y }]);
-    //console.log(slicePoints);
+  // at top-level, alongside your refs and state:
+const SLICE_INTERVAL = 150;              // ms between slice checks
+const lastSliceTime  = useRef(0);
+const lastPointRef   = useRef(null);
 
-  };
+// replace your onGestureEvent with:
+const onGestureEvent = ({ nativeEvent: { x, y ,velocityX,velocityY} }) => {
+  const now  = Date.now();
+  const last = lastPointRef.current;
   
-  const onHandlerStateChange = ({ nativeEvent }) => {
-    if (nativeEvent.state === State.END && slicePoints.length >= 2) {
-      const { translationX, translationY, velocityX, velocityY } = nativeEvent;
-     console.log('velocity', velocityX, velocityY, 'px/sec');
-     const now = Date.now();
+  // always record the point for drawing your slice line
+  lastPointRef.current = { x,y };
 
- if (lastTimestamp.current != null) {
-      // time elapsed in seconds since last frame
-      const dt = (now - lastTimestamp.current) / 1000;
-
-      const last = slicePoints.at(-1);
-      const prev = { x: last.x + velocityX * dt, y: last.y + velocityY * dt };
-      console.log('moved by', translationX, translationY, 'px');
-
-      const newPolys = [];
-     
-
-
-    quads.forEach(q => {
-      //console.log("q",q.pts);
-      // try slicing this polygon
-     const { polyA, polyB, intersections } = sliceQuad(q.pts, last, prev);
-    if (intersections.length >= 2) {
-      // it actually got cut in two—keep both halves
-      newPolys.push({ id: `${q.id}-a`, pts: polyA });
-      newPolys.push({ id: `${q.id}-b`, pts: polyB });
-    } else {
-      // no real cut—keep the original polygon
-      newPolys.push(q);
-    }
-     setDebugDots(intersections);
-     setQuads(newPolys);
-    });
-
-    setSlicePoints([]);
-       lastTimestamp.current = now;
- }
-
-     
+  // only attempt a slice every SLICE_INTERVAL ms
+  if (!last || now - lastSliceTime.current < SLICE_INTERVAL) {
+    return;
   }
-
-  if (nativeEvent.state === State.BEGAN) {
-      // reset timestamp at start of gesture
-      lastTimestamp.current = Date.now();
+  const dt = now - lastSliceTime.current;
+  lastSliceTime.current = now;
+  // build your cut segment from last→current
+  const cutB = [ last.x, last.y ];
+  const cutA = [   cutB[0] + velocityX * dt,    cutB[1] +  velocityY * dt ];
+  console.log("cutA ", cutA);
+  console.log("cutB ",cutB);
+  // slice every polygon in quads
+  const next = quads.flatMap(q => {
+    const { polyA, polyB, intersections } = sliceQuad(q.pts, cutA, cutB);
+    console.log("intersections ",intersections);
+    if (intersections.length >= 2) {
+      return [
+        { id: q.id + '-a', pts: polyA },
+        { id: q.id + '-b', pts: polyB },
+      ];
     }
-    if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED) {
-      lastTimestamp.current = null;
-    }
+    return [q];
+  });
 
-  };
+  setQuads(next);
+};
+
+// your onHandlerStateChange stays just to reset:
+const onHandlerStateChange = ({ nativeEvent }) => {
+  if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED) {
+    lastPointRef.current  = null;
+    lastSliceTime.current = 0;
+  }
+};
+  
 
   return (
     <GestureHandlerRootView>
