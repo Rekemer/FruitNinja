@@ -75,7 +75,7 @@ const ax = cutA.x,
       ax, ay, bx, by,
       curr.x, curr.y, next.x, next.y
     );
-      console.log('  intersection? →', I);
+      //console.log('  intersection? →', I);
       if (I) {
         polyA.push(I);
         polyB.push(I);
@@ -116,7 +116,7 @@ const [quads, setQuads] = useState([
   
 const slicePointsRef          = useRef([]);
   const [_, forceRerender]      = useState(0);
-
+ const lastTimestamp = useRef(null);
   
   useEffect(() => {
     spawnInterval.current = setInterval(spawnFruit, 1500);
@@ -129,14 +129,26 @@ const slicePointsRef          = useRef([]);
 
   const onGestureEvent = ({ nativeEvent: { x, y } }) => {
     setSlicePoints(p => [...p, { x, y }]);
-  };
+    //console.log(slicePoints);
 
+  };
+  
   const onHandlerStateChange = ({ nativeEvent }) => {
     if (nativeEvent.state === State.END && slicePoints.length >= 2) {
-    const last = slicePoints.at(-1);
-    const prev = slicePoints.at(-3);
+      const { translationX, translationY, velocityX, velocityY } = nativeEvent;
+     console.log('velocity', velocityX, velocityY, 'px/sec');
+     const now = Date.now();
 
-   const newPolys = [];
+ if (lastTimestamp.current != null) {
+      // time elapsed in seconds since last frame
+      const dt = (now - lastTimestamp.current) / 1000;
+
+      const last = slicePoints.at(-1);
+      const prev = { x: last.x + velocityX * dt, y: last.y + velocityY * dt };
+      console.log('moved by', translationX, translationY, 'px');
+
+      const newPolys = [];
+     
 
 
     quads.forEach(q => {
@@ -156,7 +168,20 @@ const slicePointsRef          = useRef([]);
     });
 
     setSlicePoints([]);
+       lastTimestamp.current = now;
+ }
+
+     
   }
+
+  if (nativeEvent.state === State.BEGAN) {
+      // reset timestamp at start of gesture
+      lastTimestamp.current = Date.now();
+    }
+    if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED) {
+      lastTimestamp.current = null;
+    }
+
   };
 
   return (
