@@ -4,6 +4,26 @@ import Svg, { Polygon,Circle, Line } from 'react-native-svg';
 import { PanGestureHandler, GestureHandlerRootView ,State } from 'react-native-gesture-handler';
 const { width, height } = Dimensions.get('window');
 
+function makeQuad(cx, cy, size) {
+  const s = size / 2;
+  return [
+    { x: cx - s, y: cy - s },
+    { x: cx + s, y: cy - s },
+    { x: cx + s, y: cy + s },
+    { x: cx - s, y: cy + s },
+  ];
+}
+
+ function makeFruit() {
+    const size = 80 + Math.random()*40;
+    const cx   = Math.random()*(width-size) + size/2;
+    const cy   = height + size/2;
+    return {
+      pts: makeQuad(cx, cy, size),
+      vx:  (Math.random()-0.5)*200,
+      vy: - (780 + Math.random()*400),
+    };
+  }
 
 function segmentIntersectionPoint(x1,y1,x2,y2, x3,y3,x4,y4) {
   // Line AB represented parametrically: A + t*(B−A)
@@ -89,12 +109,33 @@ const ax = cutA[0],
 }
 
 
+function makeStartQuad()
+{
+  // 1) How big is each quad?
+const size = 80;                // 80 px square
 
+// 2) Where does it start?
+//    Horizontally centered, just below the bottom edge
+const startX = width  / 2;
+const startY = height + size/2; 
+
+// 3) How fast does it launch?
+//    A little random side‐to‐side, and straight up at 300–500 px/sec
+const initialVx = (Math.random() - 0.5) * 100;        // ±50 px/s
+const initialVy = - (800 + Math.random() * 200);     // –300 to –500 px/s
+
+  return {
+    id: '0',
+    pts: makeQuad(startX, startY, size),
+    vx: initialVx,
+    vy: initialVy,
+    isSliced: false,
+  };
+}
 export default function App() {
   
   const [slicePoints, setSlicePoints] = useState([]);
   const [debugDots, setDebugDots] = useState([]);
-  const spawnInterval = useRef(null);
 
    // Example quad corners
   const scale = 150;
@@ -110,80 +151,141 @@ const quadPts = [
   { x: x3, y: y3 },  // bottom-right
   { x: x4, y: y4 },  // bottom-left
 ];
+
+
 const [quads, setQuads] = useState([
-    { id: 0, pts: quadPts }
-  ]);
+  makeStartQuad()
+]);
   
 const slicePointsRef          = useRef([]);
   const [_, forceRerender]      = useState(0);
  const lastTimestamp = useRef(null);
-  
-  useEffect(() => {
-    spawnInterval.current = setInterval(spawnFruit, 1500);
-    return () => clearInterval(spawnInterval.current);
-  }, []);
 
-  const spawnFruit = () => {
-    // TODO: randomize x, velocity, color, radius & push into `fruits`
-  };
+
 
   // at top-level, alongside your refs and state:
 const SLICE_INTERVAL = 150;              // ms between slice checks
+
+// gravity acceleration (px/s²)
+const GRAVITY = 1200;
+// how often to spawn a new fruit (ms)
+const SPAWN_INTERVAL = 800;
+
 const lastSliceTime  = useRef(0);
-const lastPointRef   = useRef(null);
+const lastPtRef   = useRef(null);
 
-// replace your onGestureEvent with:
-const onGestureEvent = ({ nativeEvent: { x, y ,velocityX,velocityY} }) => {
+
+
+useEffect(() => {
+  let last = Date.now();
+ let mounted = true;
+ function frame() {
+    //console.log("sd");
+    if (!mounted) return;
+    const now = Date.now();
+    const dt  = (now - last) / 1000;
+    last = now;
+
+    setQuads(old => {
+      // 1) Advance & drop any sliced‐off pieces
+      const advanced = old.flatMap(f => {
+        // integrate physics
+        const newPts = f.pts.map(p => ({
+          x: p.x + f.vx * dt,
+          y: p.y + f.vy * dt + 0.5 * GRAVITY * dt * dt
+        }));
+        const newVy = f.vy + GRAVITY * dt;
+
+        // if the piece was sliced, or has fallen off screen, drop it
+        if (Math.min(...newPts.map(p => p.y)) > height + 50) {
+          return [];
+        }
+
+        // otherwise keep it flying
+        return [{ ...f, pts: newPts, vy: newVy }];
+      });
+
+      // 2) If nothing remains, spawn a fresh one
+      if (advanced.length === 0) {
+        return [ makeStartQuad() ];
+      }
+
+      return advanced;
+    });
+
+    
+    requestAnimationFrame(frame);
+  }
+  const id = requestAnimationFrame(frame);
+  return () => { mounted = false; };
+  return () => cancelAnimationFrame(id);
+}, []);
+
+
+
+
+
+// …
+
+const onGestureEvent = ({ nativeEvent:{ x, y } }) => {
   const now  = Date.now();
-  const last = lastPointRef.current;
-  
-  // always record the point for drawing your slice line
-  lastPointRef.current = { x,y };
-
-  // only attempt a slice every SLICE_INTERVAL ms
+  const last = lastPtRef.current;
+  setSlicePoints(p => [...p, { x, y }]);
   if (!last || now - lastSliceTime.current < SLICE_INTERVAL) {
+    lastPtRef.current = { x, y };
     return;
   }
-  const dt = now - lastSliceTime.current;
   lastSliceTime.current = now;
-  // build your cut segment from last→current
-  const cutB = [ last.x, last.y ];
-  const cutA = [   cutB[0] + velocityX * dt,    cutB[1] +  velocityY * dt ];
-  console.log("cutA ", cutA);
-  console.log("cutB ",cutB);
-  // slice every polygon in quads
-  const next = quads.flatMap(q => {
-    const { polyA, polyB, intersections } = sliceQuad(q.pts, cutA, cutB);
-    console.log("intersections ",intersections);
-    if (intersections.length >= 2) {
-      return [
-        { id: q.id + '-a', pts: polyA },
-        { id: q.id + '-b', pts: polyB },
-      ];
-    }
-    return [q];
-  });
 
-  setQuads(next);
+  setQuads(old =>
+    old.flatMap(f => {
+      const { polyA, polyB, intersections } = sliceQuad(f.pts, [last.x,last.y], [x,y]);
+      if (intersections.length >= 2) {
+        // split into two flying halves
+        return [
+          { id: f.id+'a', pts: polyA, vx: f.vx - 50, vy: f.vy - 200, isSliced : true},
+          { id: f.id+'b', pts: polyB, vx: f.vx + 50, vy: f.vy - 200, isSliced : true},
+        ];
+      }
+      return [f];  // untouched
+    })
+  );
+
+  lastPtRef.current = { x, y };
 };
 
-// your onHandlerStateChange stays just to reset:
 const onHandlerStateChange = ({ nativeEvent }) => {
-  if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED) {
-    lastPointRef.current  = null;
+  if (
+    nativeEvent.state === State.END ||
+    nativeEvent.state === State.CANCELLED
+  ) {
+    // reset both refs
+    lastPtRef.current     = null;
     lastSliceTime.current = 0;
+        setSlicePoints([]);
   }
 };
   
 
   return (
-    <GestureHandlerRootView>
+    <GestureHandlerRootView style={styles.flex}>
+      <PanGestureHandler
+        onGestureEvent={onGestureEvent}
+        onHandlerStateChange={onHandlerStateChange}
+      >
+        <View style={styles.flex}>
+<Svg width={width} height={height} style={{flex:1}}>
+  {quads.map(f => (
+    <Polygon
+      key={f.id}
+      points={f.pts.map(p=>`${p.x},${p.y}`).join(' ')}
+      fill="orange"
+      stroke="black"
+      strokeWidth={2}
+    />
+  ))}
+</Svg>
 
-<PanGestureHandler
-      onGestureEvent={onGestureEvent}
-      onHandlerStateChange={onHandlerStateChange}
-    >
-      <View style={styles.container}>
         <Svg style={StyleSheet.absoluteFill}>
           
           {slicePoints.length > 1 && (
@@ -197,42 +299,14 @@ const onHandlerStateChange = ({ nativeEvent }) => {
             />
           )}
         </Svg>
-        <Svg style={StyleSheet.absoluteFill}>
-  {/* Example: Render a quad (arbitrary quadrilateral) */}
-  {/* <Polygon
-    points={`${x1},${y1} ${x2},${y2} ${x3},${y3} ${x4},${y4}`}
-    fill="rgba(255,0,0,0.3)"
-    stroke="red"
-    strokeWidth={2}
-  /> */}
-{quads.map(q => (
-  <Polygon
-    key={q.id}
-    points={ q.pts.map(p => `${p.x},${p.y}`).join(' ') }
-    fill={q.id ==1 ? 'rgba(255,0,255,0.3)':'rgba(0,0,255,0.3)'}
-    stroke="black"
-    strokeWidth={2}
-  />
-))}
-{/* debug: intersection points */}
-{debugDots.map((p, i) => (
-  <Circle
-    key={`dot${i}`}
-    cx={p.x}
-    cy={p.y}
-    r={5}
-    fill="red"
-  />
-))}
-</Svg>
-      </View>
-    </PanGestureHandler>
-
+        </View>
+      </PanGestureHandler>
     </GestureHandlerRootView>
-    
   );
+  
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+   container: { flex: 1, backgroundColor: '#fafafa' },
+  flex:      { flex: 1 },        // ← add this
 });
