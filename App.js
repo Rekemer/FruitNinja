@@ -91,7 +91,7 @@ const ax = cutA[0],
 
     // 2b) Then, if it crosses, insert the intersection
     if (currSide * nextSide < 0) {
-      const I = lineHitsSegment(
+      const I = segmentIntersectionPoint(
       ax, ay, bx, by,
       curr.x, curr.y, next.x, next.y
     );
@@ -235,11 +235,19 @@ const onGestureEvent = ({ nativeEvent:{ x, y } }) => {
     lastPtRef.current = { x, y };
     return;
   }
+  const SWIPE_PADDING = 150;
   lastSliceTime.current = now;
+ const dx = x - last.x, dy = y - last.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 0) {
+      const ux = dx / len, uy = dy / len;
 
+      // extend both ends by SWIPE_PADDING
+      const A = [ last.x - ux * SWIPE_PADDING, last.y - uy * SWIPE_PADDING ];
+      const B = [ x        + ux * SWIPE_PADDING, y        + uy * SWIPE_PADDING ];
   setQuads(old =>
     old.flatMap(f => {
-      const { polyA, polyB, intersections } = sliceQuad(f.pts, [last.x,last.y], [x,y]);
+      const { polyA, polyB, intersections } = sliceQuad(f.pts, A, B);
       if (intersections.length >= 2) {
         // split into two flying halves
         return [
@@ -252,6 +260,7 @@ const onGestureEvent = ({ nativeEvent:{ x, y } }) => {
   );
 
   lastPtRef.current = { x, y };
+}
 };
 
 const onHandlerStateChange = ({ nativeEvent }) => {
