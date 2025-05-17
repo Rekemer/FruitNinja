@@ -112,14 +112,30 @@ const startY = height + size/2;
 //    A little random side‐to‐side, and straight up at 300–500 px/sec
 const initialVx = (Math.random() - 0.5) * 100;        // ±50 px/s
 const initialVy = - (800 + Math.random() * 200);     // –300 to –500 px/s
-
+// import all of your fruit images
+const Pear   = require('./assets/pear.png');
+const Apple  = require('./assets/strawberry.png');
+const Banana = require('./assets/banana.png');
+// put them in an array
+const FRUITS = [ Pear, Apple, Banana ];
+const imageUri = FRUITS[Math.floor(Math.random() * FRUITS.length)];
   return {
     id: '0',
     pts: makeQuad(startX, startY, size),
     vx: initialVx,
     vy: initialVy,
     isSliced: false,
-    imageUri: require('./assets/pear.png'), // replace with your asset
+    imageUri: imageUri, // replace with your asset
+
+    
+    // **this** is the imageBox:
+    imageBox: {
+      x: startX - size/2,
+      y: startY - size/2,
+      w: size,
+      h: size
+    }
+
   };
 }
 export default function App() {
@@ -162,9 +178,12 @@ useEffect(() => {
       // 1) Advance & drop any sliced‐off pieces
       const advanced = old.flatMap(f => {
         // integrate physics
+        const dx = f.vx * dt;
+const dy = f.vy * dt + 0.5 * GRAVITY * dt*dt;
+
         const newPts = f.pts.map(p => ({
-          x: p.x + f.vx * dt,
-          y: p.y + f.vy * dt + 0.5 * GRAVITY * dt * dt
+          x: p.x + dx,
+          y: p.y + dy
         }));
         const newVy = f.vy + GRAVITY * dt;
 
@@ -174,7 +193,15 @@ useEffect(() => {
         }
 
         // otherwise keep it flying
-        return [{ ...f, pts: newPts, vy: newVy }];
+        return [{ ...f, pts: newPts, vy: newVy
+          ,
+          imageBox: {
+    x: f.imageBox.x + dx,
+    y: f.imageBox.y + dy,
+    w: f.imageBox.w,
+    h: f.imageBox.h
+  }
+         }];
       });
 
       // 2) If nothing remains, spawn a fresh one
@@ -219,8 +246,8 @@ const onGestureEvent = ({ nativeEvent:{ x, y } }) => {
       if (intersections.length >= 2) {
         // split into two flying halves
         return [
-          { id: f.id+'a', pts: polyA, vx: f.vx - 50, vy: f.vy - 200, isSliced : true},
-          { id: f.id+'b', pts: polyB, vx: f.vx + 50, vy: f.vy - 200, isSliced : true},
+          { id: f.id+'a', pts: polyA, imageBox : f.imageBox, vx: f.vx - 50, vy: f.vy - 200, isSliced : true, imageUri : f.imageUri},
+          { id: f.id+'b', pts: polyB, imageBox : f.imageBox, vx: f.vx + 50, vy: f.vy - 200, isSliced : true, imageUri : f.imageUri},
         ];
       }
       return [f];  // untouched
@@ -268,21 +295,26 @@ const onHandlerStateChange = ({ nativeEvent }) => {
     .join(' ');
 
   return (
-    <G key={f.id} transform={`translate(${minX},${minY})`}>
-      <Defs>
-        <ClipPath id={`cp-${f.id}`}>
-          <Polygon points={localPts} />
-        </ClipPath>
-      </Defs>
-      <SvgImage
-        href={f.imageUri}
-        x={0}   y={0}
-        width={boxW}
-        height={boxH}
-        preserveAspectRatio="xMidYMid slice"
-        clipPath={`url(#cp-${f.id})`}
-      />
-    </G>
+    <G  key={f.id} transform={`translate(${minX},${minY})`}>
+  <Defs>
+    <ClipPath id={`cp-${f.id}`}>
+      <Polygon points={localPts}/>
+    </ClipPath>
+  </Defs>
+
+  <SvgImage
+    href={f.imageUri}
+    // place the full sprite under this group,
+    // so it sits exactly where the fruit was:
+    x={f.imageBox.x - minX}
+    y={f.imageBox.y - minY}
+    width={f.imageBox.w}
+    height={f.imageBox.h}
+
+    preserveAspectRatio="xMidYMid meet"
+    clipPath={`url(#cp-${f.id})`}
+  />
+</G>
   );
 })}
 </Svg>
