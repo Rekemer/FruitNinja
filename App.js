@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Polygon,Circle, Line } from 'react-native-svg';
+import Svg, {   G, Polygon,Circle, Line, Defs, ClipPath,Image as SvgImage } from 'react-native-svg';
 import { PanGestureHandler, GestureHandlerRootView ,State } from 'react-native-gesture-handler';
 const { width, height } = Dimensions.get('window');
 
@@ -13,17 +13,6 @@ function makeQuad(cx, cy, size) {
     { x: cx - s, y: cy + s },
   ];
 }
-
- function makeFruit() {
-    const size = 80 + Math.random()*40;
-    const cx   = Math.random()*(width-size) + size/2;
-    const cy   = height + size/2;
-    return {
-      pts: makeQuad(cx, cy, size),
-      vx:  (Math.random()-0.5)*200,
-      vy: - (780 + Math.random()*400),
-    };
-  }
 
 function segmentIntersectionPoint(x1,y1,x2,y2, x3,y3,x4,y4) {
   // Line AB represented parametrically: A + t*(B−A)
@@ -130,12 +119,12 @@ const initialVy = - (800 + Math.random() * 200);     // –300 to –500 px/s
     vx: initialVx,
     vy: initialVy,
     isSliced: false,
+    imageUri: require('./assets/pear.png'), // replace with your asset
   };
 }
 export default function App() {
   
   const [slicePoints, setSlicePoints] = useState([]);
-  const [debugDots, setDebugDots] = useState([]);
 
    // Example quad corners
   const scale = 150;
@@ -144,32 +133,15 @@ export default function App() {
   const x3 = x2,         y3 = y1 + scale;
   const x4 = x1,         y4 = y3;
 
-// Your quad’s corners in sequence (clockwise or counter‐clockwise)
-const quadPts = [
-  { x: x1, y: y1 },  // top-left
-  { x: x2, y: y2 },  // top-right
-  { x: x3, y: y3 },  // bottom-right
-  { x: x4, y: y4 },  // bottom-left
-];
-
-
 const [quads, setQuads] = useState([
   makeStartQuad()
 ]);
   
-const slicePointsRef          = useRef([]);
-  const [_, forceRerender]      = useState(0);
- const lastTimestamp = useRef(null);
-
-
-
   // at top-level, alongside your refs and state:
 const SLICE_INTERVAL = 150;              // ms between slice checks
 
 // gravity acceleration (px/s²)
 const GRAVITY = 1200;
-// how often to spawn a new fruit (ms)
-const SPAWN_INTERVAL = 800;
 
 const lastSliceTime  = useRef(0);
 const lastPtRef   = useRef(null);
@@ -218,14 +190,10 @@ useEffect(() => {
   }
   const id = requestAnimationFrame(frame);
   return () => { mounted = false; };
-  return () => cancelAnimationFrame(id);
 }, []);
 
 
 
-
-
-// …
 
 const onGestureEvent = ({ nativeEvent:{ x, y } }) => {
   const now  = Date.now();
@@ -283,16 +251,40 @@ const onHandlerStateChange = ({ nativeEvent }) => {
         onHandlerStateChange={onHandlerStateChange}
       >
         <View style={styles.flex}>
-<Svg width={width} height={height} style={{flex:1}}>
-  {quads.map(f => (
-    <Polygon
-      key={f.id}
-      points={f.pts.map(p=>`${p.x},${p.y}`).join(' ')}
-      fill="orange"
-      stroke="black"
-      strokeWidth={2}
-    />
-  ))}
+<Svg width={width} height={height} style={styles.flex}>
+  {quads.map((f) => {
+  // 1) compute the quad’s bounding box
+  const xs = f.pts.map(p => p.x);
+  const ys = f.pts.map(p => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const boxW = Math.max(...xs) - minX;
+  const boxH = Math.max(...ys) - minY;
+
+  // 2) convert the quad’s points into local coords
+  const localPts = f.pts
+    .map(p => ({ x: p.x - minX, y: p.y - minY }))
+    .map(p => `${p.x},${p.y}`)
+    .join(' ');
+
+  return (
+    <G key={f.id} transform={`translate(${minX},${minY})`}>
+      <Defs>
+        <ClipPath id={`cp-${f.id}`}>
+          <Polygon points={localPts} />
+        </ClipPath>
+      </Defs>
+      <SvgImage
+        href={f.imageUri}
+        x={0}   y={0}
+        width={boxW}
+        height={boxH}
+        preserveAspectRatio="xMidYMid slice"
+        clipPath={`url(#cp-${f.id})`}
+      />
+    </G>
+  );
+})}
 </Svg>
 
         <Svg style={StyleSheet.absoluteFill}>
