@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { ImageBackground,View, StyleSheet, Dimensions } from 'react-native';
 import Svg, {   G, Polygon,Circle, Line, Defs, ClipPath,Image as SvgImage } from 'react-native-svg';
 import { PanGestureHandler, GestureHandlerRootView ,State } from 'react-native-gesture-handler';
 const { width, height } = Dimensions.get('window');
@@ -101,7 +101,7 @@ const ax = cutA[0],
 function makeStartQuad()
 {
   // 1) How big is each quad?
-const size = 80;                // 80 px square
+const size = 120;                // 80 px square
 
 // 2) Where does it start?
 //    Horizontally centered, just below the bottom edge
@@ -153,8 +153,7 @@ const [quads, setQuads] = useState([
   makeStartQuad()
 ]);
   
-  // at top-level, alongside your refs and state:
-const SLICE_INTERVAL = 150;              // ms between slice checks
+
 
 // gravity acceleration (px/s²)
 const GRAVITY = 1200;
@@ -226,24 +225,34 @@ const onGestureEvent = ({ nativeEvent:{ x, y } }) => {
   const now  = Date.now();
   const last = lastPtRef.current;
   setSlicePoints(p => [...p, { x, y }]);
+  // at top-level, alongside your refs and state:
+const SLICE_INTERVAL = 250;              // ms between slice checks
+  if (!last) {
+    lastPtRef.current = { x, y };
+    // Pretend the last slice happened long ago, so we won't throttle the first real swipe
+    lastSliceTime.current = 0;
+    return;
+  }
+
+  console.log(now - lastSliceTime.current);
   if (!last || now - lastSliceTime.current < SLICE_INTERVAL) {
     lastPtRef.current = { x, y };
     return;
   }
   const SWIPE_PADDING = 150;
-  lastSliceTime.current = now;
- const dx = x - last.x, dy = y - last.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 0) {
-      const ux = dx / len, uy = dy / len;
-
-      // extend both ends by SWIPE_PADDING
-      const A = [ last.x - ux * SWIPE_PADDING, last.y - uy * SWIPE_PADDING ];
-      const B = [ x        + ux * SWIPE_PADDING, y        + uy * SWIPE_PADDING ];
-  setQuads(old =>
-    old.flatMap(f => {
-      const { polyA, polyB, intersections } = sliceQuad(f.pts, A, B);
-      if (intersections.length >= 2) {
+  const dx = x - last.x, dy = y - last.y;
+  const len = Math.hypot(dx, dy);
+  if (len > 0) {
+    const ux = dx / len, uy = dy / len;
+    
+    // extend both ends by SWIPE_PADDING
+    const A = [ last.x - ux * SWIPE_PADDING, last.y - uy * SWIPE_PADDING ];
+    const B = [ x        + ux * SWIPE_PADDING, y        + uy * SWIPE_PADDING ];
+    setQuads(old =>
+      old.flatMap(f => {
+        const { polyA, polyB, intersections } = sliceQuad(f.pts, A, B);
+        if (intersections.length >= 2) {
+        lastSliceTime.current = now;
         // split into two flying halves
         return [
           { id: f.id+'a', pts: polyA, imageBox : f.imageBox, vx: f.vx - 50, vy: f.vy - 200, isSliced : true, imageUri : f.imageUri},
@@ -268,10 +277,21 @@ const onHandlerStateChange = ({ nativeEvent }) => {
     lastSliceTime.current = 0;
         setSlicePoints([]);
   }
+  if (nativeEvent.state === State.BEGAN)
+  {
+    lastPtRef.current     = { x: nativeEvent.x, y: nativeEvent.y };
+  }
 };
   
 
   return (
+
+     <ImageBackground
+      source={require('./assets/wood.jpg')}
+      style={styles.flex}
+      resizeMode="cover"
+    >
+
     <GestureHandlerRootView style={styles.flex}>
       <PanGestureHandler
         onGestureEvent={onGestureEvent}
@@ -335,6 +355,7 @@ const onHandlerStateChange = ({ nativeEvent }) => {
         </View>
       </PanGestureHandler>
     </GestureHandlerRootView>
+     </ImageBackground>
   );
   
 }
