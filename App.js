@@ -1,9 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ImageBackground,View, StyleSheet, Dimensions } from 'react-native';
-import Svg, {   G, Polygon,Circle, Line, Defs, ClipPath,Image as SvgImage } from 'react-native-svg';
+import Svg, {   G, Polygon, Line, Defs, ClipPath,Image as SvgImage } from 'react-native-svg';
 import { PanGestureHandler, GestureHandlerRootView ,State } from 'react-native-gesture-handler';
+
+
 const { width, height } = Dimensions.get('window');
 
+
+import Animated, {
+  useSharedValue,
+  withTiming,
+  useAnimatedProps,
+  runOnJS
+} from 'react-native-reanimated'
+import { Circle as SvgCircle } from 'react-native-svg'
+
+const AnimatedCircle = Animated.createAnimatedComponent(SvgCircle)
+
+export function RadialFlash({ x, y, maxR, onDone }) {
+  const progress = useSharedValue(0)
+
+  useEffect(() => {
+    // grow to full size in 200ms, then call onDone
+    progress.value = withTiming(1, { duration: 200 }, () => {
+      runOnJS(onDone)()
+    })
+  }, [])
+
+  const animatedProps = useAnimatedProps(() => ({
+    r:              progress.value * maxR,
+    opacity:        1 - progress.value,
+  }))
+
+  return (
+    <AnimatedCircle
+      cx={x}
+      cy={y}
+      fill="rgba(255,255,255,0.3)"
+      animatedProps={animatedProps}
+    />
+  )
+}
 function makeQuad(cx, cy, size) {
   const s = size / 2;
   return [
@@ -141,6 +178,7 @@ const imageUri = FRUITS[Math.floor(Math.random() * FRUITS.length)];
 export default function App() {
   
   const [slicePoints, setSlicePoints] = useState([]);
+  const [particles, SetParticles] = useState([]);
 
    // Example quad corners
   const scale = 150;
@@ -160,8 +198,7 @@ const GRAVITY = 1200;
 
 const lastSliceTime  = useRef(0);
 const lastPtRef   = useRef(null);
-
-
+const [flashes, setFlashes] = useState([])
 
 useEffect(() => {
   let last = Date.now();
@@ -234,7 +271,6 @@ const SLICE_INTERVAL = 250;              // ms between slice checks
     return;
   }
 
-  console.log(now - lastSliceTime.current);
   if (!last || now - lastSliceTime.current < SLICE_INTERVAL) {
     lastPtRef.current = { x, y };
     return;
@@ -251,7 +287,19 @@ const SLICE_INTERVAL = 250;              // ms between slice checks
     setQuads(old =>
       old.flatMap(f => {
         const { polyA, polyB, intersections } = sliceQuad(f.pts, A, B);
+        
+      
+
+
         if (intersections.length >= 2) {
+
+const [{x: x1, y: y1}, {x: x2, y: y2}] = intersections;
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+ const id = Math.random().toString();
+  setFlashes(fs => [...fs, 
+        { id, x: midX, y: midY }]);
+
         lastSliceTime.current = now;
         // split into two flying halves
         return [
@@ -298,6 +346,11 @@ const onHandlerStateChange = ({ nativeEvent }) => {
         onHandlerStateChange={onHandlerStateChange}
       >
         <View style={styles.flex}>
+
+
+ 
+
+
 <Svg width={width} height={height} style={styles.flex}>
   {quads.map((f) => {
   // 1) compute the quad’s bounding box
@@ -337,10 +390,24 @@ const onHandlerStateChange = ({ nativeEvent }) => {
 </G>
   );
 })}
+
+
+{flashes.map(f => (
+  <RadialFlash
+    key={f.id}
+    x={f.x}
+    y={f.y}
+    maxR={80}
+    onDone={() => setFlashes(fs => fs.filter(x=>x.id!==f.id))}
+  />
+))}
+
 </Svg>
 
         <Svg style={StyleSheet.absoluteFill}>
           
+    
+
           {slicePoints.length > 1 && (
             <Line
               x1={slicePoints[slicePoints.length-2].x}
