@@ -27,12 +27,21 @@ export function MakeStartQuad(width, height) {
     const FRUITS = [Pear, Apple, Banana];
 
     const imageUri = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+
+
+// random spin
+  const initialAngle      = Math.random()*360;
+  const aVel   = (Math.random() - 0.5)*360; // ±180°/s
+    
     return {
         id: '0',
         pts: MakeQuad(startX, startY, size),
         vx: initialVx,
         vy: initialVy,
         isSliced: false,
+         angle: initialAngle,
+    aVel,
+    pivot: { x: startX, y: startY }, 
         imageUri: imageUri, 
         imageBox: {
             x: startX - size / 2,

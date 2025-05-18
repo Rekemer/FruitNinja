@@ -29,8 +29,12 @@ export function RenderQuads(quads) {
             .map(p => ({ x: p.x - minX, y: p.y - minY }))
             .map(p => `${p.x},${p.y}`)
             .join(' ');
+            // pivot in local coords:
+    const localPx = f.pivot.x - minX,
+          localPy = f.pivot.y - minY;
+          
         return (
-            <G key={f.id} transform={`translate(${minX},${minY})`}>
+            <G key={f.id} transform={`translate(${minX},${minY})  rotate(${f.angle},${localPx},${localPy})` } >
                 <Defs>
                     <ClipPath id={`cp-${f.id}`}>
                         <Polygon points={localPts} />

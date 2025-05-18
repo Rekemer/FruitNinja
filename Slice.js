@@ -47,15 +47,36 @@ function SliceQuad(quadPts, cutA, cutB) {
 
     return { polyA, polyB, intersections };
 }
+export function centroid(pts) {
+  let A = 0;      // accumulated signed area
+  let Cx = 0;     // accumulated moments for x
+  let Cy = 0;     // accumulated moments for y
 
+  const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const { x: x0, y: y0 } = pts[i];
+    const { x: x1, y: y1 } = pts[(i + 1) % n];
+    const cross = x0 * y1 - x1 * y0;
+    A  += cross;
+    Cx += (x0 + x1) * cross;
+    Cy += (y0 + y1) * cross;
+  }
+
+  A *= 0.5;
+  // For a non-degenerate polygon A ≠ 0
+  return {
+    x: Cx / (6 * A),
+    y: Cy / (6 * A)
+  };
+}
 export function ProcessSwipeSlice({
     quads,
     A,
     B,
     now,
     lastSliceTimeRef,
-    SWIPE_INTERVAL = 250
 }) {
+    const SWIPE_INTERVAL = 150;
     const newFlashes = []
     const newQuads = quads.flatMap(fruit => {
         const { polyA, polyB, intersections } = SliceQuad(fruit.pts, A, B)
@@ -66,12 +87,17 @@ export function ProcessSwipeSlice({
             const midX = (x1 + x2) / 2
             const midY = (y1 + y2) / 2
 
+
+            
+            console.log(now - lastSliceTimeRef.current >= SWIPE_INTERVAL);
             // throttle so we only slice once per interval
             if (now - lastSliceTimeRef.current >= SWIPE_INTERVAL) {
-                lastSliceTimeRef.current = now
+                const pivotA = centroid(polyA),
+                pivotB = centroid(polyB);
+                lastSliceTimeRef.current = now;
                 newFlashes.push({
                     id: Math.random().toString(),
-                    x: midX,
+                    x: midX,  
                     y: midY
                 })
 
@@ -82,6 +108,8 @@ export function ProcessSwipeSlice({
                         pts: polyA,
                         vx: fruit.vx - 50,
                         vy: fruit.vy - 200,
+                        pivot: pivotA,
+                        aVel: fruit.aVel + 200, 
                         isSliced: true
                     },
                     {
@@ -90,6 +118,8 @@ export function ProcessSwipeSlice({
                         pts: polyB,
                         vx: fruit.vx + 50,
                         vy: fruit.vy - 200,
+                        pivot: pivotB,
+                        aVel: fruit.aVel - 200, 
                         isSliced: true
                     }
                 ]

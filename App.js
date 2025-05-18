@@ -30,12 +30,16 @@ function AdvanceQuads(oldQuads, dt, width, height) {
     if (Math.min(...newPts.map(p => p.y)) > height + 50) {
       return [];
     }
-
+const newAngle = (f.angle + f.aVel*dt) % 360;
+        // move pivot along:
+        const newPivot = { x: f.pivot.x + dx, y: f.pivot.y + dy };
     // otherwise keep flying:
     return [{
       ...f,
       pts: newPts,
       vy: newVy,
+       angle: newAngle,
+          pivot: newPivot,
       imageBox: {
         x: f.imageBox.x + dx,
         y: f.imageBox.y + dy,
