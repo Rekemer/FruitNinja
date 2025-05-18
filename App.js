@@ -15,7 +15,7 @@ const { width, height } = Dimensions.get('window');
 
 function AdvanceQuads(oldQuads, dt, width, height) {
   // gravity acceleration (px/s²)
-  const GRAVITY = 1200;
+  const GRAVITY = 1000;
   // update positions
   const advanced = oldQuads.flatMap(f => {
     const dx = f.vx * dt;
@@ -66,10 +66,6 @@ export default function App() {
   ]);
 
 
-
-  
-
-  const lastSliceTime = useRef(0);
   const lastPtRef = useRef(null);
   const [flashes, setFlashes] = useState([])
 
@@ -104,7 +100,6 @@ export default function App() {
 
     if (!last) {
       lastPtRef.current = { x, y }
-      lastSliceTime.current = 0
       return
     }
 
@@ -127,8 +122,7 @@ export default function App() {
       quads,
       A,
       B,
-      now,
-      lastSliceTimeRef: lastSliceTime
+      now
     })
 
     setQuads(newQuads)
@@ -147,7 +141,6 @@ export default function App() {
       nativeEvent.state === State.CANCELLED
     ) {
       lastPtRef.current = null;
-      lastSliceTime.current = 0;
       setSlicePoints([]);
     }
     if (nativeEvent.state === State.BEGAN) {

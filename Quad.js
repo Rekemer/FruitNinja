@@ -9,6 +9,15 @@ function MakeQuad(cx, cy, size) {
 }
 
 
+// move each point fractionally toward the centroid
+function insetPoly(pts, insetFraction) {
+  const cx = pts.reduce((sum,p)=> sum+p.x,0) / pts.length;
+  const cy = pts.reduce((sum,p)=> sum+p.y,0) / pts.length;
+  return pts.map(p => ({
+    x: cx + (p.x - cx) * (1 - insetFraction),
+    y: cy + (p.y - cy) * (1 - insetFraction),
+  }));
+}
 
 export function MakeStartQuad(width, height) {
 
@@ -31,15 +40,17 @@ export function MakeStartQuad(width, height) {
 
 // random spin
   const initialAngle      = Math.random()*360;
-  const aVel   = (Math.random() - 0.5)*360; // ±180°/s
-    
+  const aVel   = (Math.random() - 0.5)*360;
+  const pts = MakeQuad(startX, startY, size);
     return {
         id: '0',
-        pts: MakeQuad(startX, startY, size),
+        pts,
         vx: initialVx,
         vy: initialVy,
         isSliced: false,
          angle: initialAngle,
+         SWIPE_INTERVAL:150,
+         lastSliceTimeRef : 0,
     aVel,
     pivot: { x: startX, y: startY }, 
         imageUri: imageUri, 
@@ -47,8 +58,7 @@ export function MakeStartQuad(width, height) {
             x: startX - size / 2,
             y: startY - size / 2,
             w: size,
-            h: size
+            h: size,
         }
-
     };
 }

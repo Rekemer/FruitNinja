@@ -73,12 +73,12 @@ export function ProcessSwipeSlice({
     quads,
     A,
     B,
-    now,
-    lastSliceTimeRef,
+    now
 }) {
-    const SWIPE_INTERVAL = 150;
+   
     const newFlashes = []
     const newQuads = quads.flatMap(fruit => {
+        console.log(fruit.hitPts);
         const { polyA, polyB, intersections } = SliceQuad(fruit.pts, A, B)
         if (intersections.length >= 2) {
          
@@ -87,14 +87,12 @@ export function ProcessSwipeSlice({
             const midX = (x1 + x2) / 2
             const midY = (y1 + y2) / 2
 
-
-            
-            console.log(now - lastSliceTimeRef.current >= SWIPE_INTERVAL);
+            console.log(fruit.lastSliceTimeRef);
             // throttle so we only slice once per interval
-            if (now - lastSliceTimeRef.current >= SWIPE_INTERVAL) {
+            if (now - fruit.lastSliceTimeRef >= fruit.SWIPE_INTERVAL) {
                 const pivotA = centroid(polyA),
                 pivotB = centroid(polyB);
-                lastSliceTimeRef.current = now;
+                fruit.lastSliceTimeRef= now;
                 newFlashes.push({
                     id: Math.random().toString(),
                     x: midX,  
@@ -110,17 +108,21 @@ export function ProcessSwipeSlice({
                         vy: fruit.vy - 200,
                         pivot: pivotA,
                         aVel: fruit.aVel + 200, 
-                        isSliced: true
-                    },
-                    {
-                        ...fruit,
-                        id: fruit.id + 'b',
+                        isSliced: true,
+                         lastSliceTimeRef: fruit.lastSliceTimeRef,
+                         SWIPE_INTERVAL: fruit.SWIPE_INTERVAL,
+                        },
+                        {
+                            ...fruit,
+                            id: fruit.id + 'b',
+                            lastSliceTimeRef: fruit.lastSliceTimeRef,
                         pts: polyB,
                         vx: fruit.vx + 50,
                         vy: fruit.vy - 200,
                         pivot: pivotB,
                         aVel: fruit.aVel - 200, 
-                        isSliced: true
+                        isSliced: true,
+                        SWIPE_INTERVAL: fruit.SWIPE_INTERVAL,
                     }
                 ]
             }
